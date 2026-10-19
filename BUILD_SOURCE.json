@@ -1,7 +1,7 @@
 {
-  "version": "1.1.0+6",
-  "source_commit": "c2478e53465ced6e7eacfe259edc97bc34656b73",
-  "source_archive_sha256": "c5f6a79fd5a389ab4fd8ac68bffc54c7545d4d6fbbea4bceb1b6a53e6dbc8d35",
+  "version": "1.1.0+7",
+  "source_commit": "686a57864f1b5edc49929cd46adc62fec29a2e66",
+  "source_archive_sha256": "562a5cc82bdad654f708f87732bbe4273c0d88eb95cf9d4b21f84054c0b66144",
   "source_entries": 297,
   "history_copied": false,
   "private_signing_material_copied": false,

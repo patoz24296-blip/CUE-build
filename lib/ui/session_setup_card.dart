@@ -51,6 +51,11 @@ class SessionSetupCard extends StatelessWidget {
                     'fr': 'French',
                     'de': 'German',
                     'it': 'Italian',
+                    'pt': 'Portuguese',
+                    'ja': 'Japanese',
+                    'zh': 'Chinese',
+                    'ko': 'Korean',
+                    'ru': 'Russian',
                   }.entries)
                     DropdownMenuItem(
                       value: language.key,
@@ -62,6 +67,13 @@ class SessionSetupCard extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 16),
+              if (settings.language != 'en' && settings.language != 'es')
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Listening uses the selected language. Partner voices use English.',
+                  ),
+                ),
               Text(
                 'Script view',
                 style: Theme.of(context).textTheme.titleSmall,

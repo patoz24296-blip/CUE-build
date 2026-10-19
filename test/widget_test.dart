@@ -37,6 +37,38 @@ void main() {
     await temporary.delete(recursive: true);
   });
   testWidgets(
+    'Existing Japanese recognition settings remain valid in session preparation',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ListView(
+              children: [
+                SessionSetupCard(
+                  models: controller.models,
+                  settings: const AppSettings(language: 'ja'),
+                  followScript: false,
+                  onFollowScript: (_) {},
+                  onLanguageChanged: (_) {},
+                  onComponents: () {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Japanese'), findsOneWidget);
+      expect(
+        find.text(
+          'Listening uses the selected language. Partner voices use English.',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
     'Small iPhone with enlarged text can read settings without overflow',
     (tester) async {
       tester.view.physicalSize = const Size(320, 568);

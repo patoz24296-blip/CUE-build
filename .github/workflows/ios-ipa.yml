@@ -1,0 +1,100 @@
+name: iPhone IPA for Sideloadly
+# Manual only. Use genuinely free build capacity; see docs/FREE_FOREVER.md.
+on:
+  workflow_dispatch:
+    inputs:
+      native_tests:
+        description: Run the installed simulator and native inference checks
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  iphone:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: {flutter-version: '3.35.4', channel: stable, cache: true}
+      - run: flutter pub get --enforce-lockfile
+      - name: Verify Dart formatting
+        run: dart format --output=none --set-exit-if-changed lib test integration_test tool/native_inference_smoke.dart packages/cue_native/lib
+      - name: Analyze
+        run: flutter analyze --no-pub --fatal-infos
+      - name: Test
+        run: |
+          flutter test --no-pub --coverage
+          python3 tool/verify_ipa_test.py
+      - name: Build device meaning and embedding framework
+        env: {CUE_IOS_DEVICE_ONLY: '1'}
+        run: bash tool/build_native_ios.sh
+      - name: Build unsigned iPhone app
+        run: flutter build ios --release --no-pub --no-codesign
+      - name: Package and verify IPA
+        run: bash tool/package_ipa.sh
+      - name: Upload IPA and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: CUE-iPhone-Sideloadly
+          path: |
+            build/sideload/CUE.ipa
+            build/sideload/CUE.ipa.sha256
+          if-no-files-found: error
+          retention-days: 30
+  native_checks:
+    runs-on: macos-15-intel
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: {flutter-version: '3.35.4', channel: stable, cache: true}
+      - run: flutter pub get --enforce-lockfile
+      - name: Identify native SDK
+        id: sdk
+        run: echo "version=$(xcodebuild -version | shasum -a 256 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        id: native
+        with:
+          path: |
+            packages/cue_native/ios/Native
+            packages/cue_native/macos/Native
+          key: cue-apple-universal-${{ steps.sdk.outputs.version }}-${{ hashFiles('packages/cue_native/src/**', 'tool/build_native_ios.sh', 'tool/build_native_macos.sh') }}
+      - name: Build universal iPhone inference framework
+        if: steps.native.outputs.cache-hit != 'true'
+        run: bash tool/build_native_ios.sh
+      - name: Build host inference framework
+        if: steps.native.outputs.cache-hit != 'true'
+        run: bash tool/build_native_macos.sh
+      - uses: actions/cache/save@v4
+        if: steps.native.outputs.cache-hit != 'true'
+        with:
+          path: |
+            packages/cue_native/ios/Native
+            packages/cue_native/macos/Native
+          key: ${{ steps.native.outputs.cache-primary-key }}
+      - uses: actions/cache@v4
+        with:
+          path: build/smoke-models
+          key: cue-native-fixtures-${{ hashFiles('assets/models.json') }}
+      - name: Verify real native meaning and embeddings
+        if: github.event_name != 'workflow_dispatch' || inputs.native_tests
+        env:
+          CUE_SMOKE_MODELS: build/smoke-models
+          CUE_SMOKE_COMPONENTS: meaning,embeddings,moonshine,whisper-base,vad,kokoro
+        run: |
+          python3 tool/download_smoke_models.py
+          dart run tool/native_inference_smoke.dart "$PWD/packages/cue_native/macos/Native/cue_native.framework/cue_native" "$PWD/build/smoke-models"
+      - name: Test installed iPhone simulator app and native audio/OCR
+        if: github.event_name != 'workflow_dispatch' || inputs.native_tests
+        timeout-minutes: 40
+        run: bash tool/test_iphone_simulator.sh
+      - name: Build installed macOS app
+        run: |
+          flutter build macos --release --no-pub
+          ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/CUE.app build/CUE-macOS.zip
+      - uses: actions/upload-artifact@v4
+        with: {name: CUE-macOS, path: build/CUE-macOS.zip, retention-days: 30}

@@ -1,0 +1,71 @@
+name: Installed desktop and Android builds
+# Manual only. Use genuinely free build capacity; see docs/FREE_FOREVER.md.
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to build
+        type: choice
+        default: all
+        options: [all, android, windows, linux]
+permissions:
+  contents: read
+concurrency:
+  group: platforms-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'windows'
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: {flutter-version: '3.35.4', cache: true}
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build windows --release --verbose
+      - name: Verify portable Windows runtime
+        shell: pwsh
+        run: |
+          foreach ($library in @('msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+            if (!(Test-Path -LiteralPath "build/windows/x64/runner/Release/$library")) {
+              throw "Missing portable runtime: $library"
+            }
+          }
+      - shell: pwsh
+        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath build/CUE-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with: {name: CUE-Windows, path: build/CUE-Windows.zip, retention-days: 30}
+  linux:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'linux'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libpulse-dev tesseract-ocr
+      - uses: subosito/flutter-action@v2
+        with: {flutter-version: '3.35.4', cache: true}
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build linux --release
+      - run: tar -czf build/CUE-Linux.tar.gz -C build/linux/x64/release/bundle .
+      - uses: actions/upload-artifact@v4
+        with: {name: CUE-Linux, path: build/CUE-Linux.tar.gz, retention-days: 30}
+  android:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'android'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make room for Android native builds
+        run: |
+          # This is a disposable hosted runner. Flutter installs its pinned NDK below.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/ndk /opt/hostedtoolcache/CodeQL
+          df -h .
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: subosito/flutter-action@v2
+        with: {flutter-version: '3.35.4', cache: true}
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with: {name: CUE-Android-unsigned, path: build/app/outputs/flutter-apk/app-release.apk, retention-days: 30}

@@ -1,0 +1,13 @@
+group 'studio.cue.inference'
+version '1.0'
+buildscript {
+  repositories { google(); mavenCentral() }
+  dependencies { classpath 'com.android.tools.build:gradle:8.6.1' }
+}
+apply plugin: 'com.android.library'
+android {
+  namespace 'studio.cue.inference'
+  compileSdk 35
+  defaultConfig { minSdk 24; externalNativeBuild { cmake { arguments '-DANDROID_STL=c++_shared'; targets 'cue_native' } } }
+  externalNativeBuild { cmake { path '../src/CMakeLists.txt'; version '3.22.1' } }
+}

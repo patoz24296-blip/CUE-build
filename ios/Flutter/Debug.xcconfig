@@ -1,0 +1,4 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
+#include "Generated.xcconfig"
+// Match the ML Kit simulator slice and the CocoaPods targets.
+EXCLUDED_ARCHS[sdk=iphonesimulator*]=i386 arm64

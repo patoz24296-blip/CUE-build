@@ -1,0 +1,20 @@
+-- Historical schema shipped before session recording and multi-scene rehearsal.
+CREATE TABLE production(id TEXT PRIMARY KEY,title TEXT NOT NULL,author TEXT NOT NULL,selected_character TEXT,created_at TEXT NOT NULL);
+CREATE TABLE script_source(id TEXT PRIMARY KEY,production_id TEXT NOT NULL REFERENCES production(id) ON DELETE CASCADE,name TEXT NOT NULL,format TEXT NOT NULL);
+CREATE TABLE character(id TEXT PRIMARY KEY,production_id TEXT NOT NULL REFERENCES production(id) ON DELETE CASCADE,name TEXT NOT NULL,UNIQUE(production_id,name));
+CREATE TABLE scene(id TEXT PRIMARY KEY,production_id TEXT NOT NULL REFERENCES production(id) ON DELETE CASCADE,heading TEXT NOT NULL,position INTEGER NOT NULL);
+CREATE TABLE script_entry(id TEXT PRIMARY KEY,scene_id TEXT NOT NULL REFERENCES scene(id) ON DELETE CASCADE,type INTEGER NOT NULL,position INTEGER NOT NULL,text TEXT NOT NULL);
+CREATE TABLE dialogue_line(entry_id TEXT PRIMARY KEY REFERENCES script_entry(id) ON DELETE CASCADE,character_id TEXT NOT NULL REFERENCES character(id),parenthetical TEXT NOT NULL);
+CREATE TABLE accepted_variation(id TEXT PRIMARY KEY,line_id TEXT NOT NULL REFERENCES script_entry(id) ON DELETE CASCADE,text TEXT NOT NULL,accepted_at TEXT NOT NULL,UNIQUE(line_id,text));
+CREATE TABLE protected_phrase(id TEXT PRIMARY KEY,line_id TEXT NOT NULL REFERENCES script_entry(id) ON DELETE CASCADE,text TEXT NOT NULL,UNIQUE(line_id,text));
+CREATE TABLE voice_assignment(character_id TEXT PRIMARY KEY REFERENCES character(id) ON DELETE CASCADE,speaker INTEGER NOT NULL,rate REAL NOT NULL,direction TEXT NOT NULL);
+CREATE TABLE rehearsal_session(id TEXT PRIMARY KEY,production_id TEXT NOT NULL REFERENCES production(id) ON DELETE CASCADE,scene_id TEXT NOT NULL REFERENCES scene(id) ON DELETE CASCADE,character TEXT NOT NULL,mode INTEGER NOT NULL,practice INTEGER NOT NULL,started_at TEXT NOT NULL,finished_at TEXT NOT NULL,completed INTEGER NOT NULL);
+CREATE TABLE line_attempt(id TEXT PRIMARY KEY,session_id TEXT NOT NULL REFERENCES rehearsal_session(id) ON DELETE CASCADE,line_id TEXT NOT NULL REFERENCES script_entry(id) ON DELETE CASCADE,transcript TEXT NOT NULL,accepted INTEGER NOT NULL,textual_accuracy REAL NOT NULL,semantic_accuracy REAL,confidence REAL NOT NULL,classification INTEGER NOT NULL,meaning_changed INTEGER NOT NULL,missing TEXT NOT NULL,inserted TEXT NOT NULL,violations TEXT NOT NULL,reason TEXT NOT NULL,response_ms INTEGER NOT NULL,duration_ms INTEGER NOT NULL,hints INTEGER NOT NULL,at TEXT NOT NULL,interrupted INTEGER NOT NULL);
+CREATE TABLE cue_request(id TEXT PRIMARY KEY,attempt_id TEXT NOT NULL REFERENCES line_attempt(id) ON DELETE CASCADE,level INTEGER NOT NULL);
+CREATE TABLE model_installation(id TEXT PRIMARY KEY,path TEXT NOT NULL,bytes INTEGER NOT NULL,installed_at TEXT NOT NULL);
+CREATE TABLE app_setting(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+CREATE INDEX entry_scene_position ON script_entry(scene_id,position);
+CREATE INDEX attempt_line ON line_attempt(line_id);
+CREATE INDEX session_production_date ON rehearsal_session(production_id,started_at DESC);
+ALTER TABLE line_attempt ADD COLUMN used_semantic_model INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE recording(id TEXT PRIMARY KEY,session_id TEXT REFERENCES rehearsal_session(id) ON DELETE CASCADE,path TEXT NOT NULL,created_at TEXT NOT NULL);
